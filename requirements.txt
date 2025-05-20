@@ -8,3 +8,4 @@ pdfplumber
 beautifulsoup4
 pandas
 openai
+sentence-transfor
