@@ -1,7 +1,3 @@
-Here is a **detailed and production-ready `README.md`** file for your project, tailored exactly to your codebase and the project functionalities you listed.
-
----
-
 # 📘 QueryGenius: Intelligent Document & Web Assistant
 
 QueryGenius is a **Retrieval-Augmented Generation (RAG)** powered assistant that can understand your **PDFs, CSVs, JSONs**, and even **scrape and query websites**. It integrates **DeepSeek LLM (via OpenRouter API)** for fluent natural language responses and uses **HuggingFace embeddings** for document understanding and search.
