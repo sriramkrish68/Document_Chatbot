@@ -1,11 +1,22 @@
-streamlit
-langchain
-langchain-community
-langchain-core
-faiss-cpu
-huggingface_hub
-pdfplumber
-beautifulsoup4
-pandas
-openai
-sentence-transfor
+# Core dependencies
+streamlit>=1.33.0
+langchain>=0.1.13
+langchain-community>=0.0.32
+langchain-core>=0.1.34
+
+# Document loaders and parsing
+pdfplumber>=0.10.3
+pandas>=2.2.2
+beautifulsoup4>=4.12.3
+requests>=2.31.0
+
+# Embeddings and vector storage
+sentence-transformers>=2.2.2
+faiss-cpu>=1.7.4
+huggingface-hub>=0.21.4
+
+# OpenRouter-compatible OpenAI client (used by LangChain)
+openai>=1.23.6
+
+# Optional: For secrets management in Streamlit
+python-dotenv>=1.0.1
