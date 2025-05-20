@@ -36,6 +36,7 @@ st.caption("🚀 Your Intelligent Document & Web Assistant")
 # Sidebar Configuration
  
 
+# Sidebar Configuration (model selection updated)
 with st.sidebar:
     st.header("⚙️ Configuration")
     data_source = st.radio("Select Data Source", ["Upload PDF", "Upload CSV/JSON", "Scrape Website"])
@@ -49,7 +50,17 @@ with st.sidebar:
         website_url = st.text_input("Enter website URL")
 
     st.divider()
-    st.markdown("### Model: DeepSeek V3 via OpenRouter API")
+    st.markdown("### 🤖 Select OpenRouter Model")
+    selected_model = st.selectbox(
+        "Choose a model:",
+        [
+            "mistralai/mistral-nemo:free",
+            "qwen/qwen3-235b-a22b:free",
+            "google/gemini-2.0-flash-exp:free",
+            "meta-llama/llama-4-maverick:free"
+        ],
+        index=0
+    )
     st.markdown("Built with [LangChain](https://docs.langchain.com) + [OpenRouter](https://openrouter.ai)")
 
  
@@ -80,15 +91,15 @@ def chunk_text(text):
 
  
 # OpenRouter-Compatible Chat Model
- 
 
-class OpenRouterLLM(ChatOpenAI):
-    def __init__(self):
+class OpenRouterLLM(OpenAI):
+    def __init__(self, model_name):
         super().__init__(
+            openai_api_key=st.secrets["api"]["openrouter_api_key"],
             base_url="https://openrouter.ai/api/v1",
-            api_key=st.secrets["api"]["openrouter_api_key"],
-            model="deepseek/deepseek-chat-v3-0324:free"
+            model_name=model_name,
         )
+
 
  
 # Build RAG Pipeline
@@ -98,22 +109,23 @@ def build_vector_store(documents):
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     return FAISS.from_documents(documents, embeddings)
 
-def build_rag_chain(vector_store):
+def build_rag_chain(vector_store, model_name):
     retriever = vector_store.as_retriever()
     prompt = PromptTemplate.from_template("""
     You are an intelligent assistant. Use the context to answer the user's query.
     If the answer is unknown, say "I don't know."
-    
+
     Question: {question}
     Context: {context}
     Answer:
     """)
     return RetrievalQA.from_chain_type(
-        llm=OpenRouterLLM(),
+        llm=OpenRouterLLM(model_name=model_name),
         retriever=retriever,
         chain_type="stuff",
         chain_type_kwargs={"prompt": prompt}
     )
+
 
  
 # Load & Process Documents
@@ -136,7 +148,7 @@ else:
 if text_data:
     docs = chunk_text(text_data)
     knowledge_base = build_vector_store(docs)
-    rag_chain = build_rag_chain(knowledge_base)
+    rag_chain = build_rag_chain(knowledge_base, selected_model)
     st.success("✅ Knowledge base loaded and indexed successfully.")
 
  
