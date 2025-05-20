@@ -1,177 +1,193 @@
-# 📘 QueryGenius: Intelligent Document & Web Assistant
+# 📘 QueryGenius: AI-Powered Document & Web Assistant
 
-QueryGenius is a **Retrieval-Augmented Generation (RAG)** powered assistant that can understand your **PDFs, CSVs, JSONs**, and even **scrape and query websites**. It integrates **DeepSeek LLM (via OpenRouter API)** for fluent natural language responses and uses **HuggingFace embeddings** for document understanding and search.
+🚀 **QueryGenius** is a powerful, user-friendly RAG (Retrieval-Augmented Generation) system that enables users to upload documents or enter URLs and interact with them via natural language queries.
 
-Built with **LangChain**, **Streamlit**, and **FAISS**, this tool offers an end-to-end smart assistant for document analysis, web scraping, and conversational Q\&A.
+It uses **LangChain**, **FAISS**, and **OpenRouter LLMs** with model-switching capability to dynamically integrate state-of-the-art open-source models like **DeepSeek**, **LLaMA**, **Qwen**, **Gemini**, and **Mistral**.
 
----
-
-## 🚀 Features
-
-* ✅ Upload and query **PDF** documents
-* ✅ Load and analyze **CSV / JSON** files
-* ✅ **Scrape website content** and query it
-* ✅ **Conversational Q\&A** using `deepseek-chat-v3-0324:free` via OpenRouter
-* ✅ Uses **HuggingFace's `all-MiniLM-L6-v2`** for fast and free local embedding
-* ✅ Saves Q\&A sessions in `qa_responses.json`
-* ✅ Clean UI with **Streamlit Dark Theme**
-* ✅ Modular RAG pipeline using LangChain's components
+> 🌐 **Live Demo**: [Click to Try the App](https://documentchatbot-dmlqpeszsfpttc9gw5gqng.streamlit.app/)
 
 ---
 
-## 📂 Project Structure
+## ✨ Features
 
+* 📄 Upload and query **PDF**, **CSV**, or **JSON** files
+* 🌍 Scrape and query **website content**
+* 🧠 RAG pipeline using **LangChain + FAISS** for contextual answers
+* 🔄 **Model-switching dropdown** to choose from multiple OpenRouter-hosted LLMs
+* 💬 Conversational chat interface powered by **Streamlit**
+* 💾 Save full Q\&A sessions to JSON
+* 🔒 API Key integration using Streamlit secrets
+
+---
+
+## ⚙️ Available LLMs (via OpenRouter)
+
+Select your preferred model from the sidebar:
+
+| Model Name                         | Description                                  |
+| ---------------------------------- | -------------------------------------------- |
+| `mistralai/mistral-nemo:free`      | Lightweight, fast model by Mistral           |
+| `qwen/qwen3-235b-a22b:free`        | High-performance Chinese-English model       |
+| `google/gemini-2.0-flash-exp:free` | Google's fast inference Gemini 2.0           |
+| `meta-llama/llama-4-maverick:free` | Cutting-edge open-source LLaMA 4-based model |
+
+---
+
+## 🧱 Tech Stack
+
+| Component      | Technology                                         |
+| -------------- | -------------------------------------------------- |
+| Backend        | Python                                             |
+| Framework      | [Streamlit](https://streamlit.io)                  |
+| Vector Store   | [FAISS](https://github.com/facebookresearch/faiss) |
+| Language Model | OpenRouter API (various LLMs)                      |
+| Text Chunking  | `RecursiveCharacterTextSplitter` from LangChain    |
+| RAG Pipeline   | `RetrievalQA` from LangChain                       |
+| Parsing        | `PDFPlumber`, `pandas`, `BeautifulSoup`            |
+| Deployment     | Streamlit Cloud                                    |
+
+---
+
+## 🧠 System Architecture
+
+```plaintext
+             ┌────────────────────┐
+             │  User Input (UI)   │
+             └─────────┬──────────┘
+                       │
+            ┌──────────▼───────────┐
+            │ Upload / Scrape Data │
+            └──────────┬───────────┘
+                       │
+             ┌─────────▼─────────┐
+             │ Chunk & Vectorize │ ← FAISS + LangChain
+             └─────────┬─────────┘
+                       │
+              ┌────────▼────────┐
+              │   Model Switch  │ ← via Streamlit selectbox
+              └────────┬────────┘
+                       │
+         ┌─────────────▼────────────────┐
+         │ Query RAG Chain (Retriever + │
+         │    Selected LLM via OpenRouter) │
+         └─────────────┬────────────────┘
+                       │
+             ┌─────────▼────────┐
+             │   Display Answer │
+             └──────────────────┘
 ```
-Document_RAG/
-│
-├── app.py                     # Main Streamlit app
-├── qa_responses.json          # Saved Q&A session (generated at runtime)
-├── .streamlit/
-│   └── secrets.toml           # API keys for OpenRouter
-└── requirements.txt           # All required dependencies
-```
 
 ---
 
-## 🛠️ Tech Stack Used
+## 🔄 Application Flow
 
-| Purpose                   | Library / Tool                   |
-| ------------------------- | -------------------------------- |
-| Web UI                    | Streamlit                        |
-| PDF/CSV/JSON Reading      | pandas, PDFPlumber               |
-| Web Scraping              | BeautifulSoup, requests          |
-| Document Chunking         | LangChain Text Splitters         |
-| Embeddings (local)        | HuggingFace (`all-MiniLM-L6-v2`) |
-| Vector DB                 | FAISS                            |
-| Natural Language Response | DeepSeek v3 via OpenRouter       |
-| RAG Framework             | LangChain                        |
+1. **User selects** a data source:
 
----
+   * Upload a PDF
+   * Upload a CSV or JSON
+   * Input a website URL
 
-## 🧠 Flow of the Application
+2. The content is:
 
-1. **User Uploads or Enters Data Source**
+   * Loaded via appropriate loaders
+   * Chunked into semantic blocks using `RecursiveCharacterTextSplitter`
+   * Converted into vector embeddings via `OpenAIEmbeddings` (used with OpenRouter API)
 
-   * Options: PDF, CSV/JSON, or Website URL.
+3. The app builds a FAISS vector store and configures a **retriever**
 
-2. **Document Loader**
+4. The user **selects one of the supported models** from a dropdown
 
-   * PDF: Parsed using `PDFPlumberLoader`
-   * CSV/JSON: Read via pandas
-   * Website: Scraped using `requests` + `BeautifulSoup`
+5. On query, LangChain’s `RetrievalQA` chain is used with:
 
-3. **Text Chunking**
+   * Selected model from OpenRouter
+   * Prompt template to ensure structured and factual answers
 
-   * Long text is broken into smaller chunks using `RecursiveCharacterTextSplitter`.
+6. Chat is streamed via Streamlit’s interactive `st.chat_message` UI
 
-4. **Vector Store Creation**
-
-   * Chunks are embedded using `HuggingFaceEmbeddings`.
-   * Stored in a FAISS vector store for similarity search.
-
-5. **RAG Retrieval Chain**
-
-   * When the user asks a question:
-
-     * Relevant chunks are retrieved from FAISS.
-     * Prompt is formatted using `PromptTemplate`.
-     * Answer generated using `deepseek-chat-v3-0324:free` LLM via OpenRouter API.
-
-6. **Chat Interface**
-
-   * Previous messages are saved in session state.
-   * Users can ask follow-ups conversationally.
-
-7. **Export**
-
-   * Users can download the full Q\&A session as `qa_responses.json`.
+7. Q\&A logs can be saved locally in `qa_responses.json`
 
 ---
-
-## 🔐 Setup & Installation
-
-### 1. Clone the repository
+### Development
+## 📦 File Structure
 
 ```bash
-git clone https://github.com/your-username/QueryGenius.git
-cd QueryGenius
+📦 Document_RAG/
+├── app.py                  # Main Streamlit app
+├── requirements.txt        # Required packages
+├── qa_responses.json       # Saved Q&A (optional, auto-generated)
+└── .streamlit/
+    └── secrets.toml        # API key for OpenRouter (not version controlled)
 ```
 
-### 2. Create a virtual environment and install dependencies
+---
+
+## 🔑 Setup & Deployment
+
+### 1. Clone the Repository
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
+git clone https://github.com/yourname/QueryGenius-RAG.git
+cd QueryGenius-RAG
+```
+
+### 2. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 3. Add your API Key
+### 3. Add OpenRouter API Key
 
-Create a file at `.streamlit/secrets.toml`:
+Create `.streamlit/secrets.toml`:
 
 ```toml
 [api]
-openrouter_api_key = "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+openrouter_api_key = "sk-or-your-openrouter-key"
 ```
 
-Get your API key from [https://openrouter.ai](https://openrouter.ai)
+### 4. Run Locally
 
----
-
-## 📦 Requirements
-
-### `requirements.txt`
-
-```txt
-streamlit
-langchain
-langchain-community
-langchain-core
-faiss-cpu
-huggingface_hub
-pdfplumber
-beautifulsoup4
-pandas
-openai
+```bash
+streamlit run app.py
 ```
 
----
-
-## 🧪 Example Use Cases
-
-* 🔍 Upload a company’s financial report PDF → Ask: “What is the net profit for Q4?”
-* 📈 Load a JSON export of analytics → Ask: “Which day had the highest traffic?”
-* 🌐 Scrape a website blog → Ask: “What are the key ideas in the latest post?”
 
 ---
 
-## ✨ Highlights
+## 🔐 Deployment on Streamlit Cloud
 
-| Feature             | Description                                                                   |
-| ------------------- | ----------------------------------------------------------------------------- |
-| **RAG-based**       | Uses Retrieval-Augmented Generation to ground LLM answers in document content |
-| **DeepSeek API**    | High-performance free model integrated via OpenRouter                         |
-| **Free Embeddings** | No OpenAI billing; uses HuggingFace locally                                   |
-| **Web Scraper**     | Supports live web page ingestion                                              |
-| **Chat History**    | Remembers past conversations per session                                      |
-| **Exportable**      | Easily save your full session as JSON                                         |
+1. Push your project to GitHub.
+2. Go to [streamlit.io/cloud](https://streamlit.io/cloud) and deploy your app.
+3. Add `secrets.toml` API key via the "Secrets" section in Streamlit Cloud Settings.
 
 ---
 
-## 🧾 Credits & Citations
+## 💡 Additional Features
 
-* 🧠 **LLM Backend & Embedding Help**:
+* ✅ **Model Switching**: Easily switch between high-performance OpenRouter-hosted models without changing code
+* 🌍 **Web Scraping**: Enter a URL and instantly query its content
+* 📁 **Tabular Data Handling**: Intelligent parsing of both JSON and CSV data formats
+* 💬 **Chat Log**: View full chat history with option to export
+* 🧠 **Context-aware Answers**: Using FAISS + LangChain RAG
+* ☁️ **Deploy on Streamlit Cloud** with one click
 
-  * [LangChain Documentation](https://docs.langchain.com/)
-  * [HuggingFace Sentence Transformers](https://www.sbert.net/)
-  * [OpenRouter](https://openrouter.ai/)
+---
 
-* 🐞 **Error Fixing & Debugging References**:
+## 📚 Citations & Credits
 
-  * [Streamlit Secrets KeyError - Stack Overflow](https://stackoverflow.com/questions/75599488/keyerror-st-secrets-has-no-key)
+| Task                                | Source                                         |
+| ----------------------------------- | ---------------------------------------------- |
+| API Errors & Fixes                  | [Stack Overflow](https://stackoverflow.com)    |
+| Code Structuring, Model Integration | ChatGPT (OpenAI)                               |
+| Prompt Design, Grammar Fixes        | ChatGPT (Grammer)                              |
+| UI & Component Styling              | [Streamlit AI Assistant](https://streamlit.io) |
+| Readme Styling                      | Claude Sonnet 3.5                              |
+---
 
-* 🛠 **Code Structuring, Prompt Design, Rephrasing**: ChatGPT (OpenAI)
-
-* 🖼 **UI Design Suggestions**: Streamlit AI Assistant
+## 🙌 Acknowledgements
+Thanks to:
+* **OpenRouter** for hosting excellent open LLMs
+* **LangChain** for robust RAG support
+* **Streamlit** for an incredibly smooth developer UX
 
 ---
