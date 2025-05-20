@@ -92,7 +92,7 @@ def chunk_text(text):
  
 # OpenRouter-Compatible Chat Model
 
-class OpenRouterLLM(OpenAI):
+class OpenRouterLLM(ChatOpenAI):
     def __init__(self, model_name):
         super().__init__(
             openai_api_key=st.secrets["api"]["openrouter_api_key"],
