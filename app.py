@@ -12,16 +12,57 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import json
 import os
+from io import StringIO, BytesIO
 
 # Streamlit Configuration
 st.set_page_config(page_title="📘 QueryGenius", layout="wide")
 st.markdown("""
 <style>
-    .main { background-color: #1a1a1a; color: #ffffff; }
-    .sidebar .sidebar-content { background-color: #2d2d2d; }
-    .stTextInput textarea, .stChatInput input { color: #ffffff !important; }
+    .main { 
+        background-color: #1a1a1a; 
+        color: #ffffff; 
+        font-family: 'Arial', sans-serif;
+    }
+    .sidebar .sidebar-content { 
+        background-color: #2d2d2d; 
+        border-radius: 10px;
+        padding: 20px;
+    }
+    .stTextInput textarea, .stChatInput input { 
+        color: #ffffff !important; 
+        background-color: #3d3d3d !important;
+        border-radius: 8px;
+        padding: 10px;
+    }
     .stSelectbox div[data-baseweb="select"], div[role="listbox"] div {
-        color: white !important; background-color: #3d3d3d !important;
+        color: white !important; 
+        background-color: #3d3d3d !important;
+        border-radius: 8px;
+    }
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 20px;
+        transition: all 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+    .chat-message {
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+        max-width: 80%;
+    }
+    .user-message {
+        background-color: #2d3748;
+        margin-left: auto;
+    }
+    .ai-message {
+        background-color: #4a5568;
+        margin-right: auto;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -32,14 +73,14 @@ st.caption("🚀 Your Intelligent Document & Web Assistant")
 # Sidebar Configuration
 with st.sidebar:
     st.header("⚙️ Configuration")
-    data_source = st.radio("Select Data Source", ["Upload PDF", "Upload CSV/JSON", "Scrape Website"])
+    data_source = st.radio("Select Data Source", ["None", "Upload PDF", "Upload CSV/JSON", "Scrape Website"])
     file = None
     website_url = ""
     if data_source == "Upload PDF":
         file = st.file_uploader("Upload a PDF", type=["pdf"])
     elif data_source == "Upload CSV/JSON":
         file = st.file_uploader("Upload CSV or JSON", type=["csv", "json"])
-    else:
+    elif data_source == "Scrape Website":
         website_url = st.text_input("Enter website URL")
 
     st.divider()
@@ -69,11 +110,13 @@ def load_tabular(file, file_type):
     return df.to_string(index=False)
 
 def scrape_website(url):
-    response = requests.get(url)
-    if response.ok:
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         return "\n".join([p.get_text() for p in soup.find_all("p")])
-    return "Error fetching website."
+    except:
+        return "Error fetching website."
 
 def chunk_text(text):
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
@@ -83,13 +126,10 @@ def chunk_text(text):
 class OpenRouterLLM(ChatOpenAI):
     def __init__(self, model_name):
         super().__init__(
-            openai_api_key=st.secrets["api"]["openrouter_api_key"],
+            openai_api_key=st.secrets.get("api", {}).get("openrouter_api_key", "your-api-key"),
             base_url="https://openrouter.ai/api/v1",
             model_name=model_name,
         )
-
-def get_fallback_llm(model_name):
-    return OpenRouterLLM(model_name=model_name)
 
 # Build RAG Pipeline
 def build_vector_store(documents):
@@ -100,7 +140,7 @@ def build_rag_chain(vector_store, model_name):
     retriever = vector_store.as_retriever()
     prompt = PromptTemplate.from_template("""
     You are an intelligent assistant. Use the context to answer the user's query.
-    If the answer is unknown, say "I don't know."
+    If no context is provided or the answer is unknown, provide a general response based on your knowledge.
 
     Question: {question}
     Context: {context}
@@ -115,69 +155,79 @@ def build_rag_chain(vector_store, model_name):
 
 # Load & Process Documents
 knowledge_base = None
-rag_chain = None
-if file:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
-        tmp.write(file.read())
-        tmp_path = tmp.name
-    if file.name.endswith(".pdf"):
-        text_data = load_pdf(tmp_path)
-    else:
-        text_data = load_tabular(tmp_path, file.name.split('.')[-1])
-elif website_url:
-    text_data = scrape_website(website_url)
-else:
-    text_data = None
+if data_source != "None" and (file or website_url):
+    try:
+        if file:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.name)[1]) as tmp:
+                tmp.write(file.read())
+                tmp_path = tmp.name
+            if file.name.endswith(".pdf"):
+                text_data = load_pdf(tmp_path)
+            else:
+                text_data = load_tabular(tmp_path, file.name.split('.')[-1])
+        elif website_url:
+            text_data = scrape_website(website_url)
+        else:
+            text_data = None
 
-if text_data:
-    docs = chunk_text(text_data)
+        if text_data:
+            docs = chunk_text(text_data)
+            knowledge_base = build_vector_store(docs)
+            rag_chain = build_rag_chain(knowledge_base, selected_model)
+            st.success("✅ Knowledge base loaded and indexed successfully.")
+    except Exception as e:
+        st.error(f"Error processing data: {str(e)}")
+
+# Initialize default RAG chain for no-document case
+if not knowledge_base:
+    # Create a dummy vector store with a generic document
+    dummy_text = "This is a general knowledge assistant. Ask me anything!"
+    docs = chunk_text(dummy_text)
     knowledge_base = build_vector_store(docs)
     rag_chain = build_rag_chain(knowledge_base, selected_model)
-    st.success("✅ Knowledge base loaded and indexed successfully.")
 
-# Fallback LLM
-fallback_llm = get_fallback_llm(selected_model)
-
-# Session state initialization
+# Chat Interface
 if "message_log" not in st.session_state:
     st.session_state.message_log = [{"role": "ai", "content": "Hi! How can I assist you today?"}]
     st.session_state.responses = []
 
-# Chat input
+chat_box = st.container()
+with chat_box:
+    for message in st.session_state.message_log:
+        role_class = "user-message" if message["role"] == "user" else "ai-message"
+        with st.chat_message(message["role"], avatar="🤖" if message["role"] == "ai" else "👤"):
+            st.markdown(f'<div class="chat-message {role_class}">{message["content"]}</div>', unsafe_allow_html=True)
+
 user_input = st.chat_input("Ask me anything...")
 
 def respond_to_query(query):
-    if knowledge_base and rag_chain:
+    try:
         response = rag_chain.run(query)
-    else:
-        response = fallback_llm.predict(query)
-    st.session_state.responses.append({"question": query, "answer": response})
-    return response
+        st.session_state.responses.append({"question": query, "answer": response})
+        return response
+    except Exception as e:
+        return f"Error processing query: {str(e)}"
 
-# Display user input and assistant response
 if user_input:
-    # Display user message
-    st.chat_message("user").markdown(user_input)
     st.session_state.message_log.append({"role": "user", "content": user_input})
-
-    # Generate and display assistant message
-    with st.chat_message("ai"):
-        with st.spinner("Thinking..."):
-            response = respond_to_query(user_input)
-            st.markdown(response)
+    with st.spinner("Thinking..."):
+        response = respond_to_query(user_input)
     st.session_state.message_log.append({"role": "ai", "content": response})
+    with st.chat_message("ai", avatar="🤖"):
+        st.markdown(f'<div class="chat-message ai-message">{response}</div>', unsafe_allow_html=True)
+    st.rerun()
 
-# Show full chat history except the current turn (already displayed live)
-for message in st.session_state.message_log[:-2 if user_input else None]:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Save Q&A Session to Downloadable JSON
-if st.sidebar.button("📥 Save Q&A Session"):
-    output_data = json.dumps(st.session_state.responses, indent=2)
-    st.sidebar.download_button(
-        label="📩 Download JSON",
-        data=output_data,
-        file_name="qa_responses.json",
-        mime="application/json"
-    )
+# Download Q&A Session as JSON
+if st.sidebar.button("📥 Download Q&A Session"):
+    if st.session_state.responses:
+        json_str = json.dumps(st.session_state.responses, indent=2)
+        json_bytes = json_str.encode('utf-8')
+        st.sidebar.download_button(
+            label="Download JSON",
+            data=json_bytes,
+            file_name="qa_responses.json",
+            mime="application/json"
+        )
+        st.sidebar.success("Ready to download Q&A session!")
+    else:
+        st.sidebar.warning("No responses to download yet.")
