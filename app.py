@@ -143,14 +143,34 @@ if "message_log" not in st.session_state:
     st.session_state.message_log = [{"role": "ai", "content": "Hi! How can I assist you today?"}]
     st.session_state.responses = []
 
-chat_box = st.container()
-
-with chat_box:
-    for message in st.session_state.message_log:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
 user_input = st.chat_input("Ask me anything...")
+
+def respond_to_query(query):
+    if knowledge_base and rag_chain:
+        response = rag_chain.run(query)
+    else:
+        response = fallback_llm.predict(query)
+    st.session_state.responses.append({"question": query, "answer": response})
+    return response
+
+# Handle new input
+if user_input:
+    st.session_state.message_log.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.spinner("Thinking..."):
+        response = respond_to_query(user_input)
+
+    st.session_state.message_log.append({"role": "ai", "content": response})
+    with st.chat_message("ai"):
+        st.markdown(response)
+
+# Show full chat history (after updates)
+for message in st.session_state.message_log:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
 
 def respond_to_query(query):
     if knowledge_base and rag_chain:
